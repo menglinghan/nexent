@@ -36,6 +36,8 @@ const draftFromSource = (
   tags: service.tags || [],
   version: service.version || undefined,
   registryJson: service.registryJson,
+  group_ids: undefined,
+  ingroup_permission: "READ_ONLY",
 });
 
 /**
@@ -105,6 +107,8 @@ export function useMcpCommunityQuickAdd({
         market_id: source!.marketId,
         port: draft!.containerPort as number,
         mcp_config: mcpConfig,
+        group_ids: draft!.group_ids,
+        ingroup_permission: draft!.ingroup_permission,
       });
     } else {
       await addMcpToolService({
@@ -118,6 +122,8 @@ export function useMcpCommunityQuickAdd({
         version: draft!.version,
         registry_json: registryJson,
         market_id: source!.marketId,
+        group_ids: draft!.group_ids,
+        ingroup_permission: draft!.ingroup_permission,
       });
     }
     return true;

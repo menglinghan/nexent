@@ -661,6 +661,8 @@ class McpRecord(TableBase):
     enabled = Column(Boolean, default=True, doc="Enabled")
     tags = Column(ARRAY(Text), doc="Tags")
     description = Column(Text, doc="Description")
+    group_ids = Column(String, doc="MCP group IDs list")
+    ingroup_permission = Column(String(30), doc="In-group permission: EDIT, READ_ONLY, PRIVATE")
 
 
 class McpCommunityRecord(TableBase):

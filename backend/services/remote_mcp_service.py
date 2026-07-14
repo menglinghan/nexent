@@ -6,7 +6,7 @@ import socket
 import random
 from fastmcp import Client
 from fastmcp.client.transports import StreamableHttpTransport, SSETransport
-from consts.const import CAN_EDIT_ALL_USER_ROLES, PERMISSION_EDIT, PERMISSION_READ, NEXENT_MCP_DOCKER_IMAGE
+from consts.const import CAN_EDIT_ALL_USER_ROLES, PERMISSION_EDIT, PERMISSION_READ, PERMISSION_PRIVATE, NEXENT_MCP_DOCKER_IMAGE
 from consts.exceptions import (
     MCPConnectionError,
     MCPNameIllegal,
@@ -36,6 +36,8 @@ from database.remote_mcp_db import (
     get_mcp_custom_headers_by_name_and_url,
 )
 from database.user_tenant_db import get_user_tenant_by_user_id
+from database.group_db import query_group_ids_by_user
+from utils.str_utils import convert_list_to_string, convert_string_to_list
 from services.mcp_container_service import MCPContainerManager
 from utils.http_client_utils import create_httpx_client
 
@@ -244,6 +246,17 @@ def suggest_container_port() -> int:
         count += 1
     raise McpPortConflictError("No available port found")
 
+
+def _get_user_group_ids(user_id: str, tenant_id: str) -> str:
+    """Get the user's group IDs as a comma-separated string."""
+    try:
+        group_ids = query_group_ids_by_user(user_id)
+        return convert_list_to_string(group_ids)
+    except Exception as e:
+        logger.warning(f"Failed to get user groups for user {user_id}: {str(e)}")
+        return ""
+
+
 # ---------------------------------------------------------------------------
 # Add Functions
 # ---------------------------------------------------------------------------
@@ -258,6 +271,8 @@ async def add_remote_mcp_server_list(
     custom_headers: dict | None = None,
     source: str | None = "local",
     container_port: int | None = None,
+    group_ids: str | None = None,
+    ingroup_permission: str | None = None,
 ):
     """Add a remote MCP server to the list.
 
@@ -269,6 +284,8 @@ async def add_remote_mcp_server_list(
         container_id: Docker container ID (optional)
         authorization_token: Authorization token (optional)
         custom_headers: Custom HTTP headers (optional)
+        group_ids: Comma-separated user group IDs (optional)
+        ingroup_permission: In-group permission (optional)
 
     Raises:
         MCPNameIllegal: If MCP name already exists
@@ -288,6 +305,8 @@ async def add_remote_mcp_server_list(
     if not tool_names:
         raise MCPConnectionError("MCP connection failed")
 
+    resolved_group_ids = group_ids or _get_user_group_ids(user_id, tenant_id)
+
     insert_mcp_data = {
         "mcp_name": remote_mcp_server_name,
         "mcp_server": remote_mcp_server,
@@ -298,6 +317,8 @@ async def add_remote_mcp_server_list(
         "source": source,
         "container_port": container_port,
         "registry_json": {"_toolNames": tool_names},
+        "group_ids": resolved_group_ids,
+        "ingroup_permission": ingroup_permission,
     }
     create_mcp_record(mcp_data=insert_mcp_data, tenant_id=tenant_id, user_id=user_id)
 
@@ -351,6 +372,8 @@ async def add_mcp_service(
     enabled: bool = False,
     container_id: str | None = None,
     container_port: int | None = None,
+    group_ids: str | None = None,
+    ingroup_permission: str | None = None,
 ) -> None:
     """Add an MCP service record.
 
@@ -371,6 +394,8 @@ async def add_mcp_service(
         enabled: Whether the MCP is enabled
         container_id: Docker container ID
         container_port: Container port
+        group_ids: Comma-separated user group IDs (optional, auto-populated from user's groups if not set)
+        ingroup_permission: In-group permission (optional)
     """
     status: bool | None = None
     normalized_container_id = container_id if isinstance(container_id, str) and container_id else None
@@ -391,6 +416,8 @@ async def add_mcp_service(
     if enabled:
         status = True
 
+    resolved_group_ids = group_ids or _get_user_group_ids(user_id, tenant_id)
+
     create_mcp_record(
         mcp_data={
             "mcp_name": name,
@@ -407,6 +434,8 @@ async def add_mcp_service(
             "tags": tags,
             "description": description,
             "config_json": resolved_config_json,
+            "group_ids": resolved_group_ids,
+            "ingroup_permission": ingroup_permission,
         },
         tenant_id=tenant_id,
         user_id=user_id,
@@ -427,6 +456,8 @@ async def add_container_mcp_service(
     market_id: int | None,
     port: int,
     mcp_config: MCPConfigRequest,
+    group_ids: str | None = None,
+    ingroup_permission: str | None = None,
 ) -> dict:
     """Add a container-based MCP service.
 
@@ -443,6 +474,8 @@ async def add_container_mcp_service(
         community_id: Linked community record ID
         port: Host port for the container
         mcp_config: MCP server configuration
+        group_ids: Comma-separated user group IDs (optional)
+        ingroup_permission: In-group permission (optional)
 
     Returns:
         Container information dictionary
@@ -516,6 +549,8 @@ async def add_container_mcp_service(
             enabled=True,
             container_id=container_info.get("container_id"),
             container_port=container_info.get("host_port"),
+            group_ids=group_ids,
+            ingroup_permission=ingroup_permission,
         )
     except Exception as exc:
         logger.warning(f"Failed to start container MCP service: {exc}")
@@ -589,6 +624,8 @@ def update_mcp_service(
     config_json: dict | None,
     tags: list | None,
     market_id: int | None,
+    group_ids: str | None = None,
+    ingroup_permission: str | None = None,
 ) -> None:
     """Update an MCP service record by ID.
 
@@ -604,6 +641,8 @@ def update_mcp_service(
         config_json: MCP configuration JSON
         tags: MCP tags
         market_id: Linked market record ID
+        group_ids: Comma-separated user group IDs (optional)
+        ingroup_permission: In-group permission (optional)
 
     Raises:
         McpNotFoundError: If MCP record is not found
@@ -630,6 +669,8 @@ def update_mcp_service(
         config_json=next_config_json,
         tags=tags,
         market_id=next_market_id,
+        group_ids=group_ids,
+        ingroup_permission=ingroup_permission,
     )
 
 
@@ -887,10 +928,20 @@ async def get_remote_mcp_server_list(
     mcp_records = get_mcp_records_by_tenant(tenant_id=tenant_id)
     mcp_records_list = []
     can_edit_all = False
+    user_group_ids: set[int] = set()
     if user_id:
         user_tenant_record = get_user_tenant_by_user_id(user_id) or {}
         user_role = str(user_tenant_record.get("user_role") or "").upper()
         can_edit_all = user_role in CAN_EDIT_ALL_USER_ROLES
+
+        # For DEV/USER, collect user's group IDs for group-based filtering
+        if not can_edit_all:
+            try:
+                user_group_ids = set(query_group_ids_by_user(user_id) or [])
+            except Exception as e:
+                logger.warning(
+                    f"Failed to query user group ids for MCP filtering: user_id={user_id}, err={str(e)}"
+                )
 
     container_status_map = {}
     try:
@@ -908,6 +959,20 @@ async def get_remote_mcp_server_list(
         logger.warning(f"Failed to load container runtime status: {exc}")
 
     for record in mcp_records:
+        # Group-based visibility filtering (same pattern as agent listing)
+        if not can_edit_all and user_id:
+            group_ids_raw = record.get("group_ids")
+            # Skip filtering for legacy records without group_ids (backward compat)
+            if group_ids_raw:
+                mcp_group_ids = set(convert_string_to_list(group_ids_raw))
+                ingroup_perm = record.get("ingroup_permission")
+                is_creator = str(record.get("created_by") or record.get("user_id")) == str(user_id)
+                if not is_creator and (
+                    len(user_group_ids.intersection(mcp_group_ids)) == 0
+                    or ingroup_perm == PERMISSION_PRIVATE
+                ):
+                    continue
+
         created_by = record.get("created_by") or record.get("user_id")
         if user_id is None:
             permission = PERMISSION_READ
@@ -943,6 +1008,8 @@ async def get_remote_mcp_server_list(
             "config_json": record.get("config_json"),
             "market_id": record.get("market_id"),
             "is_listed_in_repository": record.get("market_id") is not None,
+            "group_ids": record.get("group_ids"),
+            "ingroup_permission": record.get("ingroup_permission"),
             "container_status": container_status,
         }
         if is_need_auth:

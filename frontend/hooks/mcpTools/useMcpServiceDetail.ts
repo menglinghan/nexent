@@ -197,6 +197,9 @@ export function useMcpServiceDetail({
     const nextUrl = currentDraft.serverUrl.trim();
     const nextToken = (currentDraft.authorizationToken ?? "").trim();
     const nextTags = currentDraft.tags;
+    const nextGroupIds: number[] | undefined = currentDraft.group_ids
+      ? currentDraft.group_ids.split(",").map(Number).filter((id) => !isNaN(id))
+      : undefined;
 
     if (!nextName) {
       message.warning(t("mcpTools.add.validate.nameRequired"));
@@ -220,6 +223,8 @@ export function useMcpServiceDetail({
         authorization_token: nextToken || undefined,
         custom_headers: currentDraft.customHeaders,
         config_json: currentDraft.configJson,
+        group_ids: nextGroupIds,
+        ingroup_permission: currentDraft.ingroup_permission,
       });
       message.success(t("mcpTools.service.saveSuccess"));
       invalidateServices();

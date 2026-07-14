@@ -48,6 +48,8 @@ type AddContainerMcpToolPayload = {
   registry_json?: Record<string, unknown>;
   version?: string;
   market_id?: number;
+  group_ids?: number[];
+  ingroup_permission?: string;
   port: number;
   mcp_config: McpContainerConfigPayload;
 };
@@ -315,6 +317,8 @@ export const listMcpTools = async (params?: { tag?: string }) => {
       communityId: s.market_id ?? undefined,
       isListedInRepository: s.is_listed_in_repository ?? undefined,
       permission: s.permission ?? undefined,
+      group_ids: s.group_ids ?? undefined,
+      ingroup_permission: s.ingroup_permission ?? undefined,
     } as McpServiceItem;
   });
   return { success: true, data: items } as McpToolsApiResult<McpServiceItem[]>;

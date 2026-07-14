@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Alert, Button, Form, Input, Upload } from "antd";
+import { useMemo, useState } from "react";
+import { Alert, Button, Col, Form, Input, Row, Select, Upload } from "antd";
 import type { UploadFile } from "antd";
 import { ApiOutlined, CloudOutlined, ContainerOutlined, LinkOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
@@ -7,6 +7,9 @@ import { McpDeploymentType, McpTransportType } from "@/const/mcpTools";
 import type { LocalAddMcpDraft } from "@/types/mcpTools";
 import { useMcpAddLocal } from "@/hooks/mcpTools/useMcpAddLocal";
 import { useMcpFormRules } from "@/hooks/mcpTools/useMcpFormRules";
+import { useGroupList, useGroupDetails } from "@/hooks/group/useGroupList";
+import { useAuthorizationContext } from "@/components/providers/AuthorizationProvider";
+import { Can } from "@/components/permission/Can";
 import ContainerPortField from "../../shared/ContainerPortField";
 import TagEditor from "../../shared/TagEditor";
 
@@ -46,6 +49,8 @@ const createInitialDraft = (): LocalAddMcpDraft => ({
   containerPort: undefined,
   uploadImageFile: null,
   tags: [],
+  group_ids: [],
+  ingroup_permission: "READ_ONLY",
 });
 
 interface AddMcpServiceLocalSectionProps {
@@ -66,6 +71,17 @@ export default function AddMcpServiceLocalSection({
   const [deploymentType, setDeploymentType] = useState<McpDeploymentType>(
     McpDeploymentType.REMOTE_LINK
   );
+  const { user, getAccessibleGroupIds } = useAuthorizationContext();
+  const { data: groupData } = useGroupList(user?.tenantId ?? null);
+  const allGroups = groupData?.groups ?? [];
+  const accessibleGroupIds = getAccessibleGroupIds();
+  const { groups: filteredGroups } = useGroupDetails(allGroups, accessibleGroupIds);
+  const groupSelectOptions = useMemo(() => {
+    return filteredGroups.map((g) => ({
+      label: g.group_name,
+      value: g.group_id,
+    }));
+  }, [filteredGroups]);
   const { submit, submitting } = useMcpAddLocal({
     onSuccess: () => {
       setDraft(createInitialDraft());
@@ -444,6 +460,44 @@ export default function AddMcpServiceLocalSection({
             </Form.Item>
           </div>
         </div>
+
+        <Can permission="group:read">
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item name="group_ids" label={t("agent.userGroup")}>
+                <Select
+                  mode="multiple"
+                  placeholder={t("agent.userGroup")}
+                  options={groupSelectOptions}
+                  allowClear
+                  value={draft.group_ids}
+                  onChange={(value) => {
+                    const next = (value ?? []) as number[];
+                    patchDraft({ group_ids: next });
+                    form.setFieldValue("group_ids", next);
+                  }}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="ingroup_permission" label={t("tenantResources.knowledgeBase.permission")}>
+                <Select
+                  placeholder={t("tenantResources.knowledgeBase.permission")}
+                  options={[
+                    { value: "EDIT", label: t("tenantResources.knowledgeBase.permission.EDIT") },
+                    { value: "READ_ONLY", label: t("tenantResources.knowledgeBase.permission.READ_ONLY") },
+                    { value: "PRIVATE", label: t("tenantResources.knowledgeBase.permission.PRIVATE") },
+                  ]}
+                  value={draft.ingroup_permission}
+                  onChange={(value) => {
+                    patchDraft({ ingroup_permission: value });
+                    form.setFieldValue("ingroup_permission", value);
+                  }}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Can>
       </Form>
 
       <div className="sticky bottom-0 flex items-center justify-between border-t border-slate-100 bg-white px-6 py-4">

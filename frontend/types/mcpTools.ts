@@ -179,6 +179,8 @@ export interface McpServiceItem {
   reviewStatus?: "pending" | "approved" | "rejected" | "offline";
   reviewType?: "initial_listing" | "version_update";
   permission?: "EDIT" | "READ_ONLY";
+  group_ids?: string;
+  ingroup_permission?: string;
 }
 
 export interface McpTagStat {
@@ -201,6 +203,8 @@ export interface AddMcpServicePayload {
   registry_json?: Record<string, unknown>;
   enabled?: boolean;
   market_id?: number;
+  group_ids?: number[];
+  ingroup_permission?: string;
 }
 
 export interface UpdateMcpServicePayload {
@@ -214,6 +218,8 @@ export interface UpdateMcpServicePayload {
   config_json?: Record<string, unknown>;
   version?: string;
   community_id?: number;
+  group_ids?: number[];
+  ingroup_permission?: string;
 }
 
 export interface ToggleMcpServicePayload {
@@ -259,6 +265,8 @@ export interface LocalAddMcpDraft {
   uploadImageFile?: File | null;
   tags: string[];
   version?: string;
+  group_ids?: number[];
+  ingroup_permission?: string;
 }
 
 /**
@@ -276,4 +284,6 @@ export interface CommunityQuickAddDraft {
   tags: string[];
   version?: string;
   registryJson?: Record<string, unknown>;
+  group_ids?: number[];
+  ingroup_permission?: string;
 }

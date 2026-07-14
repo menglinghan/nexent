@@ -123,6 +123,8 @@ export function useMcpAddLocal({ onSuccess }: UseMcpAddLocalParams) {
           registry_json: registryJson,
           port: draft.containerPort as number,
           mcp_config: mcpConfig,
+          group_ids: draft.group_ids,
+          ingroup_permission: draft.ingroup_permission,
         });
       } else {
         await addMcpToolService({
@@ -135,6 +137,8 @@ export function useMcpAddLocal({ onSuccess }: UseMcpAddLocalParams) {
           config_json: configJson,
           registry_json: registryJson,
           tags: draft.tags,
+          group_ids: draft.group_ids,
+          ingroup_permission: draft.ingroup_permission,
         });
       }
 

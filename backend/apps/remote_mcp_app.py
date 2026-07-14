@@ -51,6 +51,7 @@ from services.remote_mcp_service import (
 from services.tool_configuration_service import get_tool_from_remote_mcp_server
 from services.mcp_container_service import MCPContainerManager
 from utils.auth_utils import get_current_user_info
+from utils.str_utils import convert_list_to_string
 
 router = APIRouter(prefix="/mcp")
 logger = logging.getLogger("remote_mcp_app")
@@ -174,6 +175,8 @@ async def add_mcp_service_endpoint(
             config_json=payload.config_json,
             market_id=payload.market_id,
             enabled=payload.enabled if payload.enabled is not None else False,
+            group_ids=convert_list_to_string(payload.group_ids) if payload.group_ids else None,
+            ingroup_permission=payload.ingroup_permission,
         )
 
         return JSONResponse(
@@ -223,6 +226,8 @@ async def add_container_mcp_service_endpoint(
             market_id=payload.market_id,
             port=payload.port,
             mcp_config=payload.mcp_config,
+            group_ids=convert_list_to_string(payload.group_ids) if payload.group_ids else None,
+            ingroup_permission=payload.ingroup_permission,
         )
 
         return JSONResponse(
@@ -294,6 +299,8 @@ async def update_mcp_service_endpoint(
             config_json=payload.config_json,
             tags=payload.tags,
             market_id=payload.market_id,
+            group_ids=convert_list_to_string(payload.group_ids) if payload.group_ids else None,
+            ingroup_permission=payload.ingroup_permission,
         )
 
         return JSONResponse(

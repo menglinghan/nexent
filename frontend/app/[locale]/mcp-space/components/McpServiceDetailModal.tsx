@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, App, Button, Form, Input, Modal } from "antd";
+import { Alert, App, Button, Col, Form, Input, Modal, Row, Select } from "antd";
 import { ApiOutlined, CloudOutlined, ContainerOutlined, LinkOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import {
@@ -13,6 +13,9 @@ import type { McpServiceItem } from "@/types/mcpTools";
 import { resolveDeploymentType, toPrettyRegistryJson } from "@/lib/mcpTools";
 import { useMcpFormRules } from "@/hooks/mcpTools/useMcpFormRules";
 import { useMcpServiceDetail } from "@/hooks/mcpTools/useMcpServiceDetail";
+import { useGroupList, useGroupDetails } from "@/hooks/group/useGroupList";
+import { useAuthorizationContext } from "@/components/providers/AuthorizationProvider";
+import { Can } from "@/components/permission/Can";
 import McpContainerLogsModal from "@/components/mcp/McpContainerLogsModal";
 import McpToolListModal from "@/components/mcp/McpToolListModal";
 import ContainerPortField from "./shared/ContainerPortField";
@@ -57,6 +60,17 @@ export default function McpServiceDetailModal({
   const { t } = useTranslation("common");
   const rules = useMcpFormRules();
   const [form] = Form.useForm();
+  const { user, getAccessibleGroupIds } = useAuthorizationContext();
+  const { data: groupData } = useGroupList(user?.tenantId ?? null);
+  const allGroups = groupData?.groups ?? [];
+  const accessibleGroupIds = getAccessibleGroupIds();
+  const { groups: filteredGroups } = useGroupDetails(allGroups, accessibleGroupIds);
+  const groupSelectOptions = useMemo(() => {
+    return filteredGroups.map((g) => ({
+      label: g.group_name,
+      value: g.group_id,
+    }));
+  }, [filteredGroups]);
   const [logsOpen, setLogsOpen] = useState(false);
   const [showServerJson, setShowServerJson] = useState(false);
   const [showConfigJson, setShowConfigJson] = useState(false);
@@ -104,6 +118,8 @@ export default function McpServiceDetailModal({
       openApiJson: toPrettyRegistryJson(draft.configJson),
       containerConfigJson: toPrettyRegistryJson(draft.configJson),
       containerPort: draft.containerPort,
+      group_ids: draft.group_ids?.split(",").map(Number).filter((id) => !isNaN(id)) ?? [],
+      ingroup_permission: draft.ingroup_permission ?? "READ_ONLY",
     });
   }, [draft, form]);
 
@@ -183,6 +199,8 @@ export default function McpServiceDetailModal({
       customHeaders: parsedCustomHeaders,
       configJson: parsedConfigJson,
       tags: draftTags,
+      group_ids: values.group_ids?.length > 0 ? values.group_ids.join(",") : undefined,
+      ingroup_permission: values.ingroup_permission ?? undefined,
     };
     detail.setDraft(nextDraft);
     await detail.save(nextDraft);
@@ -440,6 +458,33 @@ export default function McpServiceDetailModal({
                 </Form.Item>
               </div>
             </div>
+
+          <Can permission="group:read">
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item name="group_ids" label={t("agent.userGroup")}>
+                  <Select
+                    mode="multiple"
+                    placeholder={t("agent.userGroup")}
+                    options={groupSelectOptions}
+                    allowClear
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item name="ingroup_permission" label={t("tenantResources.knowledgeBase.permission")}>
+                  <Select
+                    placeholder={t("tenantResources.knowledgeBase.permission")}
+                    options={[
+                      { value: "EDIT", label: t("tenantResources.knowledgeBase.permission.EDIT") },
+                      { value: "READ_ONLY", label: t("tenantResources.knowledgeBase.permission.READ_ONLY") },
+                      { value: "PRIVATE", label: t("tenantResources.knowledgeBase.permission.PRIVATE") },
+                    ]}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Can>
           </Form>
 
           <div className="flex items-center justify-between border-t border-slate-100 bg-white px-6 py-4">
